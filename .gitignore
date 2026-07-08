@@ -1,0 +1,31 @@
+# Ignore build artifacts
+Xeno.dll
+Xeno.exe
+Xeno.exp
+Xeno.lib
+Xeno.pdb
+XenoUI.dll
+XenoUI.pdb
+*.dll
+WebView2Loader.dll
+libcurl.dll
+libcrypto-3-x64.dll
+libssl-3-x64.dll
+Newtonsoft.Json.dll
+
+# Runtime files
+logs/
+*.WebView2/
+
+# Editor
+editor/
+
+# System files
+Thumbs.db
+.DS_Store
+*.lnk
+*.exe
+*.pdb
+
+# Keep workspace files (hub scripts)
+# workspace/
