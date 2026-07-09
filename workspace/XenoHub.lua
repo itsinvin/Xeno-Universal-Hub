@@ -708,7 +708,7 @@ if XenoHub.CurrentGame == "MM2" then
             for _, p in ipairs(Players:GetPlayers()) do if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then local d = (myPos.Position - p.Character.HumanoidRootPart.Position).Magnitude; if d < (bestDist or math.huge) then bestDist = d; closest = p end end end
             if closest and closest.Character and closest.Character:FindFirstChild("HumanoidRootPart") then pcall(function() gun:Activate() end) end
         end)
-    end end)
+    end })
     mm2Tab:CreateButton({Name = "Auto-Attack (Murderer)", Callback = function()
         local knife
         for _, item in ipairs(LP.Backpack:GetChildren()) do if item:FindFirstChild("Knife") then knife = item; break end end
@@ -720,7 +720,7 @@ if XenoHub.CurrentGame == "MM2" then
             for _, p in ipairs(Players:GetPlayers()) do if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then local d = (myPos.Position - p.Character.HumanoidRootPart.Position).Magnitude; if d < (bestDist or math.huge) then bestDist = d; closest = p end end end
             if closest and closest.Character and closest.Character:FindFirstChild("HumanoidRootPart") and (myPos.Position - closest.Character.HumanoidRootPart.Position).Magnitude < 15 then pcall(function() knife:Activate() end) end
         end)
-    end end)
+    end })
 end
 
 -- Game-specific: Jailbreak
