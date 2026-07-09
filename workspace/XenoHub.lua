@@ -568,7 +568,7 @@ XenoHub:AddCmd("fps", {}, "Toggle FPS counter", function()
 end)
 
 -- === RAYFIELD WINDOW ===
-local Window = Rayfield:CreateWindow({
+local winOk, Window = pcall(Rayfield.CreateWindow, Rayfield, {
     Name = "Xeno Hub v" .. XenoHub.Version .. " | " .. XenoHub.CurrentGame,
     LoadingTitle = "Xeno Universal Hub",
     LoadingSubtitle = "by itsinvin",
@@ -585,17 +585,20 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false,
     KeySettings = {}
 })
+if not winOk then warn("CreateWindow failed: " .. tostring(Window)); return end
 
--- === TABS ===
+-- === BUILD UI (wrapped for crash isolation) ===
+local uiBuild = pcall(function()
+
 -- Movement
 local movTab = Window:CreateTab("Movement", nil)
-local movSection = movTab:CreateSection("Movement")
+movTab:CreateSection("Movement")
 movTab:CreateToggle({Name = "Fly", CurrentValue = false, Callback = function(v) XenoHub.Flags.fly = v; if v then XenoHub:ExecCmd("fly 50") else XenoHub:ExecCmd("unfly") end end})
-movTab:CreateSlider({Name = "Fly Speed", Range = {10, 200}, Increment = 5, Default = 50, Callback = function(v) XenoHub.Flags.fly_speed = v end})
+movTab:CreateSlider({Name = "Fly Speed", Range = {10, 200}, Increment = 5, CurrentValue = 50, Callback = function(v) XenoHub.Flags.fly_speed = v end})
 movTab:CreateToggle({Name = "Noclip", CurrentValue = false, Callback = function(v) XenoHub.Flags.noclip = v; if v and not XenoHub.Flags.noclip_conn then XenoHub:ExecCmd("noclip") end end})
-movTab:CreateSlider({Name = "WalkSpeed", Range = {1, 250}, Increment = 1, Default = 16, Callback = function(v) if LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.WalkSpeed = v end end})
-movTab:CreateSlider({Name = "Jump Power", Range = {1, 500}, Increment = 1, Default = 50, Callback = function(v) if LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.JumpPower = v end end})
-movTab:CreateSlider({Name = "Gravity", Range = {0, 500}, Increment = 1, Default = 196, Callback = function(v) Workspace.Gravity = v end})
+movTab:CreateSlider({Name = "WalkSpeed", Range = {1, 250}, Increment = 1, CurrentValue = 16, Callback = function(v) if LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.WalkSpeed = v end end})
+movTab:CreateSlider({Name = "Jump Power", Range = {1, 500}, Increment = 1, CurrentValue = 50, Callback = function(v) if LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.JumpPower = v end end})
+movTab:CreateSlider({Name = "Gravity", Range = {0, 500}, Increment = 1, CurrentValue = 196, Callback = function(v) Workspace.Gravity = v end})
 movTab:CreateToggle({Name = "Infinite Jump", CurrentValue = false, Callback = function(v) XenoHub.Flags.infjump = v; if v and not XenoHub.Flags.infjump_conn then XenoHub:ExecCmd("infinitejump") end end})
 movTab:CreateToggle({Name = "Anti-Void", CurrentValue = false, Callback = function(v) XenoHub.Flags.antivoid = v; if v then XenoHub:ExecCmd("antivoid") end end})
 movTab:CreateToggle({Name = "Spin", CurrentValue = false, Callback = function(v) XenoHub.Flags.spin = v; XenoHub:ExecCmd("spin " .. (v and "20" or "0")) end})
@@ -632,7 +635,7 @@ visTab:CreateSection("Visuals")
 visTab:CreateToggle({Name = "ESP", CurrentValue = false, Callback = function(v) XenoHub.Flags.esp_enabled = v; XenoHub:ExecCmd("esp") end})
 visTab:CreateToggle({Name = "X-Ray", CurrentValue = false, Callback = function(v) XenoHub.Flags.xray = v; XenoHub:ExecCmd("xray") end})
 visTab:CreateToggle({Name = "Fullbright", CurrentValue = false, Callback = function(v) XenoHub.Flags.fullbright = v; XenoHub:ExecCmd("fullbright") end})
-visTab:CreateSlider({Name = "Field of View", Range = {1, 120}, Increment = 1, Default = 70, Callback = function(v) Camera.FieldOfView = v end})
+visTab:CreateSlider({Name = "Field of View", Range = {1, 120}, Increment = 1, CurrentValue = 70, Callback = function(v) Camera.FieldOfView = v end})
 visTab:CreateToggle({Name = "Freecam", CurrentValue = false, Callback = function(v) XenoHub.Flags.freecam = v; XenoHub:ExecCmd("freecam") end})
 visTab:CreateInput({Name = "Hitbox Size", PlaceholderText = "username size", Callback = function(v) XenoHub:ExecCmd("hitbox " .. v) end})
 visTab:CreateInput({Name = "Ambient Color", PlaceholderText = "R G B", Callback = function(v) XenoHub:ExecCmd("ambient " .. v) end})
@@ -734,6 +737,13 @@ if XenoHub.CurrentGame == "Jailbreak" then
     jbTab:CreateButton({Name = "TP to Donut", Callback = function() XenoHub:Teleport(Vector3.new(0, 20, 600)) end})
     jbTab:CreateButton({Name = "TP to Gas Station", Callback = function() XenoHub:Teleport(Vector3.new(500, 20, 200)) end})
     jbTab:CreateButton({Name = "TP to Police Station", Callback = function() XenoHub:Teleport(Vector3.new(1700, 20, -50)) end})
+end
+
+end) -- uiBuild pcall
+
+if not uiBuild then
+    warn("=== UI BUILD CRASHED ===")
+    error("Hub UI build failed", 0)
 end
 
 -- ESP auto-add on new players
