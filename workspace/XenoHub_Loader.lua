@@ -1,6 +1,6 @@
--- Xeno Hub Loader v2.3
+-- Xeno Hub Loader v2.4
 -- Paste this into Xeno executor
--- Logs everything to XenoHub_Log.txt — share it to debug
+-- Re-uses cached hub if already loaded, auto-logs to XenoHub_Log.txt
 
 local XENO_HUB_VERSION = "2.0"
 local RAW_URL = "https://raw.githubusercontent.com/itsinvin/Xeno-Universal-Hub/master/workspace/XenoHub.lua"
@@ -23,12 +23,7 @@ local function saveLog(success)
               "Game: " .. tostring(game.PlaceId) .. "\n" ..
               "Executor: Xeno v1.3.55\n" ..
               "URL: " .. RAW_URL .. "\n\n" .. content
-    local ok, err = pcall(function()
-        writefile("XenoHub_Log.txt", content)
-    end)
-    if not ok then
-        warn("[Xeno Hub] Failed to write log file: " .. tostring(err))
-    end
+    pcall(function() writefile("XenoHub_Log.txt", content) end)
 end
 
 local function notif(t, d)
@@ -41,13 +36,17 @@ local function notif(t, d)
     end)
 end
 
--- Don't set XENO_HUB_LOADED here — hub does it
+-- Check if already loaded (handles re-execution)
+if getgenv and getgenv().XENO_HUB_LOADED and getgenv().XENO_HUB_INSTANCE then
+    print("=== Xeno Hub v" .. XENO_HUB_VERSION .. " (reloaded from cache) ===")
+    return getgenv().XENO_HUB_INSTANCE
+end
+
 log("Loader started, waiting for game...")
 repeat task.wait() until game:IsLoaded()
 log("Game loaded. PlaceId: " .. tostring(game.PlaceId))
 notif("Loading Xeno Hub...", 3)
 
--- Check executor capabilities
 log("Executor checks:")
 pcall(function()
     log("  isfile: " .. tostring(isfile))
@@ -75,8 +74,6 @@ pcall(function()
             if code then
                 log("  read " .. tostring(#code) .. " bytes")
                 if #code > 100 then source = "local file" end
-            else
-                log("  readfile returned nil")
             end
         end
     end
@@ -151,6 +148,10 @@ end
 
 -- Execute
 log("Executing via loadstring (source: " .. tostring(source) .. ", " .. tostring(#code) .. " bytes)...")
+
+-- Clear guard so hub always runs and returns the table
+if getgenv then getgenv().XENO_HUB_LOADED = nil end
+
 local fn, err = loadstring(code)
 if not fn then
     log("loadstring FAILED: " .. tostring(err))
@@ -172,13 +173,20 @@ log("Execution OK, return type: " .. type(result))
 
 if type(result) ~= "table" then
     log("Bad return type (expected table, got " .. type(result) .. ")")
-    notif("Bad return type. Check XenoHub_Log.txt", 10)
-    saveLog(false)
-    return
+    -- Last resort: try to grab it from getgenv if hub set it anyway
+    if getgenv and getgenv().XENO_HUB_INSTANCE then
+        result = getgenv().XENO_HUB_INSTANCE
+        log("Recovered XENO_HUB_INSTANCE from getgenv")
+    else
+        notif("Bad return type. Check XenoHub_Log.txt", 10)
+        saveLog(false)
+        return
+    end
 end
 
 log("SUCCESS - Hub loaded from " .. tostring(source))
-log("Commands registered: " .. tostring(#((result.Cmds and result.Cmds) or {})))
+local cmdCount = 0; if result.Cmds then for _ in pairs(result.Cmds) do cmdCount = cmdCount + 1 end end
+log("Commands registered: " .. cmdCount)
 notif("Loaded! RightShift to toggle", 4)
 getgenv().XENO_HUB_INSTANCE = result
 
@@ -192,3 +200,5 @@ end
 saveLog(true)
 print("=== Xeno Hub Loader v" .. XENO_HUB_VERSION .. " ===")
 print("Log saved to XenoHub_Log.txt")
+
+return result
