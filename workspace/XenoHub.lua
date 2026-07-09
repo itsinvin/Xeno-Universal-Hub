@@ -15,12 +15,14 @@ XenoHub.CmdHistory = {}
 XenoHub.Prefix = ";"
 
 -- Guard for re-execution
-if getgenv().XENO_HUB_LOADED then
+if getgenv and getgenv().XENO_HUB_LOADED then
     warn("[XenoHub] Already loaded. Use hidehub to toggle or rejoin and re-execute.")
     return
 end
-getgenv().XENO_HUB_LOADED = true
-if getgenv then getgenv().XENO_HUB_INSTANCE = XenoHub end
+if getgenv then
+    getgenv().XENO_HUB_LOADED = true
+    getgenv().XENO_HUB_INSTANCE = XenoHub
+end
 
 -- === SERVICES ===
 local Players = game:GetService("Players")
@@ -467,7 +469,7 @@ do
         table.insert(tabs, container)
         table.insert(tabButtons, btn)
 
-        if #tabs == 1 then btn.MouseButton1Click:Fire() end
+        if #tabs == 1 then container.Visible = true; btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70); btn.TextColor3 = Color3.fromRGB(255, 255, 255) end
 
         local tabObj = {}
 
