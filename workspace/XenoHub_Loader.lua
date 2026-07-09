@@ -2,7 +2,7 @@
 -- Paste this into Xeno executor
 -- Writes hub to workspace for instant loading on subsequent runs
 
-local XENO_HUB_VERSION = "3.0"
+local XENO_HUB_VERSION = "3.1"
 local RAW_URL = "https://raw.githubusercontent.com/itsinvin/Xeno-Universal-Hub/master/workspace/XenoHub.lua"
 
 local logLines = {}
@@ -103,8 +103,8 @@ if not code then
     return
 end
 
--- Save to workspace for future runs
-if code and #code > 100 and writefile then
+-- Save to workspace for future runs (only if looks valid)
+if code and #code > 100 and writefile and (code:find("XenoHub") or code:find("Rayfield")) then
     pcall(function() writefile("workspace/XenoHub.lua", code) end)
     log("Saved to workspace/XenoHub.lua for next time")
 end
@@ -152,7 +152,7 @@ log("Commands: " .. cmdCount)
 notif("Loaded! RightShift to toggle", 4)
 getgenv().XENO_HUB_INSTANCE = result
 
-local qot = syn and syn.queue_on_teleport or queue_on_teleport
+local qot = (syn and syn.queue_on_teleport) or queue_on_teleport
 if qot and writefile then
     qot([[
         local s = pcall(function()
