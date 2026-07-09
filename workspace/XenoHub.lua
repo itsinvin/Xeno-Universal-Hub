@@ -1500,7 +1500,7 @@ moveTab:Toggle("No Fall Damage", false, function(state)
                     hum:ChangeState(Enum.HumanoidStateType.Landed)
                 end
             end)
-            char:AncestryChanged:Connect(function()
+            char.AncestryChanged:Connect(function()
                 if not char.Parent and stateConn then stateConn:Disconnect() end
             end)
         end)
@@ -1708,7 +1708,8 @@ end)
 
 print("=== Xeno Universal Hub v" .. XenoHub.Version .. " loaded ===")
 print("Detected game: " .. XenoHub.CurrentGame)
-print("Commands available: " .. #XenoHub.Cmds .. " | Use " .. XenoHub.Prefix .. "command in the command bar")
+local cmdCount = 0; for _ in pairs(XenoHub.Cmds) do cmdCount = cmdCount + 1 end
+print("Commands available: " .. cmdCount .. " | Use " .. XenoHub.Prefix .. "command in the command bar")
 print("Press RightShift to toggle GUI")
 
 return XenoHub
