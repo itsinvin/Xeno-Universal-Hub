@@ -38,7 +38,7 @@ local Teams = game:GetService("Teams")
 local TeleportService = game:GetService("TeleportService")
 local StarterGui = game:GetService("StarterGui")
 local StatsService = game:GetService("Stats")
-local ChatService = game:GetService("Chat")
+-- ChatService = game:GetService("Chat") -- unused, keep commented
 
 local LP = Players.LocalPlayer
 local Mouse = LP:GetMouse()
@@ -214,18 +214,18 @@ function XenoHub:ExecCmd(input, speaker)
     end
 
     -- Loop syntax: N^delay^command or inf^delay^command
-    local loopMatch = input:match("^(%d+%^[%d.]+%^.+)$") or input:match("^(inf%^[%d.]+%^.+)$")
+    local loopMatch = input:match("^(%d+%^%d+%.?%d*%^.+)$") or input:match("^(inf%^%d+%.?%d*%^.+)$")
     if loopMatch then
         local countStr, delayStr, cmd = loopMatch:match("^(.-)%^(.-)%^(.+)$")
         local count = countStr == "inf" and -1 or tonumber(countStr)
         local delay = tonumber(delayStr) or 1
         local loopCount = 0
-        local conn
-        conn = RunService.Heartbeat:Connect(function()
-            if (count > 0 and loopCount >= count) then conn:Disconnect(); return end
-            loopCount = loopCount + 1
-            XenoHub:ExecCmd(cmd, speaker)
-            task.wait(delay)
+        task.spawn(function()
+            while loopCount < count or count < 0 do
+                if count > 0 then loopCount = loopCount + 1 end
+                XenoHub:ExecCmd(cmd, speaker)
+                task.wait(delay)
+            end
         end)
         return
     end
@@ -293,7 +293,8 @@ function XenoHub:Notify(title, text, length)
     textLbl.Parent = frame
 
     frame.Parent = NotificationGui
-    frame:TweenPosition(UDim2.new(1, -270, 1, -100 - (#NotificationGui:GetChildren() * 80)), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+    local notifCount = #NotificationGui:GetChildren() - 1
+    frame:TweenPosition(UDim2.new(1, -270, 1, -100 - (notifCount * 80)), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
     task.delay(length, function()
         pcall(function()
             frame:TweenPosition(UDim2.new(1, 0, 1, -100), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.3, true)
@@ -381,6 +382,7 @@ do
     tabList.CanvasSize = UDim2.new(0, 0, 0, 0)
     tabList.AutomaticCanvasSize = Enum.AutomaticSize.Y
     tabList.Parent = tabFrame
+    tabFrame.Parent = main
 
     local contentFrame = Instance.new("ScrollingFrame")
     contentFrame.Size = UDim2.new(1, -145, 1, -6)
@@ -390,22 +392,23 @@ do
     contentFrame.ScrollBarThickness = 4
     contentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     contentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    contentFrame.Parent = main
 
     -- Drag
-    local dragging, dragStart, frameStart
+    local windowDragging, dragStart, frameStart
     titleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true; dragStart = input.Position; frameStart = main.Position
+            windowDragging = true; dragStart = input.Position; frameStart = main.Position
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if windowDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local d = input.Position - dragStart
             main.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + d.X, frameStart.Y.Scale, frameStart.Y.Offset + d.Y)
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then windowDragging = false end
     end)
 
     local tabs = {}
@@ -425,6 +428,7 @@ do
     function lib:Tab(name)
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, -10, 0, 0)
+        container.AutomaticSize = Enum.AutomaticSize.Y
         container.Position = UDim2.new(0, 5, 0, 0)
         container.BackgroundTransparency = 1
         container.Visible = false
@@ -531,17 +535,17 @@ do
             fill.BackgroundColor3 = Color3.fromRGB(50, 120, 210); fill.BorderSizePixel = 0
             local fc = Instance.new("UICorner"); fc.CornerRadius = UDim.new(1, 0); fc.Parent = fill; fill.Parent = sb
 
-            local dragging = false
-            sb.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end end)
+            local sliderDragging = false
+            sb.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then sliderDragging = true end end)
             UserInputService.InputChanged:Connect(function(input)
-                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                if sliderDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
                     local pos = math.clamp((input.Position.X - sb.AbsolutePosition.X) / sb.AbsoluteSize.X, 0, 1)
                     val = min + (max - min) * pos; fill.Size = UDim2.new(pos, 0, 1, 0); lbl.Text = text .. ": " .. tostring(math.floor(val))
                 end
             end)
             UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then
-                    dragging = false; pcall(cb, math.floor(val))
+                if input.UserInputType == Enum.UserInputType.MouseButton1 and sliderDragging then
+                    sliderDragging = false; pcall(cb, math.floor(val))
                 end
             end)
             sb.Parent = bg; bg.Parent = container; return function() return math.floor(val) end
@@ -616,6 +620,33 @@ do
     XenoHub.lib = lib
 end
 
+-- Fly physics functions (must be defined before command registrations)
+local flyConn
+local function startFlyPhysics()
+    if flyConn then flyConn:Disconnect() end
+    flyConn = RunService.RenderStepped:Connect(function()
+        if not XenoHub.Flags.fly then return end
+        local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local bv = hrp:FindFirstChild("XenoFly")
+        if bv then
+            local dir = Vector3.new(0, 0, 0)
+            if XenoHub.Flags.fly_up then dir = dir + Vector3.new(0, 1, 0) end
+            if XenoHub.Flags.fly_down then dir = dir + Vector3.new(0, -1, 0) end
+            local camLook = Camera.CFrame.LookVector
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + camLook end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - camLook end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
+            if dir.Magnitude > 0 then dir = dir.Unit * (XenoHub.Flags.fly_speed or 50) end
+            bv.Velocity = dir
+        end
+    end)
+end
+local function stopFlyPhysics()
+    if flyConn then flyConn:Disconnect(); flyConn = nil end
+end
+
 -- === COMMAND REGISTRATIONS (IY-inspired) ===
 
 -- Movement
@@ -632,16 +663,19 @@ XenoHub:AddCmd("fly", {"fly"}, "Toggle fly mode", function(args)
         hum.PlatformStand = true
         local bv = Instance.new("BodyVelocity")
         bv.Name = "XenoFly"; bv.MaxForce = Vector3.new(100000, 100000, 100000); bv.Velocity = Vector3.new(0,0,0); bv.Parent = hrp
-        XenoHub:Notify("Fly", "Fly enabled (speed: " .. speed .. ")")
+        startFlyPhysics()
+        XenoHub:Notify("Fly", "Fly enabled (speed: " .. spd .. ")")
     else
         hum.PlatformStand = false
+        stopFlyPhysics()
         local bv = hrp:FindFirstChild("XenoFly"); if bv then bv:Destroy() end
         XenoHub:Notify("Fly", "Fly disabled")
     end
 end)
 
-XenoHub:AddCmd("unfly", {"nofly", "novfly"}, "Disable fly", function()
+XenoHub:AddCmd("unfly", {"nofly"}, "Disable fly", function()
     XenoHub.Flags.fly = false
+    stopFlyPhysics()
     local char = LP.Character
     if char then
         local hum = char:FindFirstChild("Humanoid")
@@ -1124,25 +1158,43 @@ end)
 XenoHub:AddCmd("antifling", {}, "Toggle anti-fling", function()
     XenoHub.Flags.antifling = not XenoHub.Flags.antifling
     if XenoHub.Flags.antifling then
-        local mt = getrawmetatable and getrawmetatable(game)
-        if mt then
-            local oldIdx = mt.__index
+        local suc = pcall(function()
+            local mt = getrawmetatable(game)
+            XenoHub.Flags.antifling_old = mt.__index
             setreadonly(mt, false)
             mt.__index = newcclosure(function(self, key)
                 if key == "CanCollide" and self:IsA("BasePart") and self.Parent == LP.Character then
                     return false
                 end
-                return oldIdx(self, key)
+                return XenoHub.Flags.antifling_old(self, key)
             end)
             setreadonly(mt, true)
-        end
-        XenoHub:Notify("Anti-Fling", "Enabled")
+        end)
+        if suc then XenoHub:Notify("Anti-Fling", "Enabled") end
     else
+        pcall(function()
+            local mt = getrawmetatable(game)
+            if XenoHub.Flags.antifling_old then
+                setreadonly(mt, false)
+                mt.__index = XenoHub.Flags.antifling_old
+                setreadonly(mt, true)
+                XenoHub.Flags.antifling_old = nil
+            end
+        end)
         XenoHub:Notify("Anti-Fling", "Disabled")
     end
 end)
 
-local fireTouch = firetouchinterest or function() end
+function XenoHub:Teleport(pos)
+    local char = LP.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(pos)
+    end
+end
+
+local fireTouch = firetouchinterest or function()
+    warn("[XenoHub] firetouchinterest not available on this executor")
+end
 
 XenoHub:AddCmd("handlekill", {"hkill"}, "Kill player with tool", function(args)
     if not args[1] then return end
@@ -1181,8 +1233,10 @@ XenoHub:AddCmd("serverhop", {"shop"}, "Server hop", function()
             if cursor ~= "" then url = url .. "&cursor=" .. cursor end
             return game:HttpGet(url)
         end)
+        local data
         if suc then
-            local data = HttpService:JSONDecode(res)
+            local suc2, decoded = pcall(function() return HttpService:JSONDecode(res) end)
+            if suc2 then data = decoded end
             if data and data.data then
                 for _, server in ipairs(data.data) do
                     if server.id ~= game.JobId then
@@ -1191,7 +1245,7 @@ XenoHub:AddCmd("serverhop", {"shop"}, "Server hop", function()
                     end
                 end
             end
-            cursor = data.nextPageCursor or ""
+            if data then cursor = data.nextPageCursor or "" end
             if cursor == "" then break end
         else break end
     end
@@ -1200,17 +1254,24 @@ end)
 
 XenoHub:AddCmd("antiafk", {"antiidle"}, "Toggle anti-AFK", function()
     XenoHub.Flags.antiafk = not XenoHub.Flags.antiafk
-    if XenoHub.Flags.antiafk and not XenoHub.Flags.antiafk_conn then
-        XenoHub.Flags.antiafk_conn = RunService.Heartbeat:Connect(function()
-            if XenoHub.Flags.antiafk then
-                local char = LP.Character
-                if char and char:FindFirstChild("Humanoid") then
-                    char.Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+    if XenoHub.Flags.antiafk then
+        if not XenoHub.Flags.antiafk_conn then
+            XenoHub.Flags.antiafk_conn = RunService.Heartbeat:Connect(function()
+                if XenoHub.Flags.antiafk then
+                    local char = LP.Character
+                    if char and char:FindFirstChild("Humanoid") then
+                        char.Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+                    end
+                    VirtualInputManager:SendMouseMoveEvent(0, 0, false)
+                    task.wait(5)
                 end
-                VirtualInputManager:SendMouseMoveEvent(0, 0, false)
-                task.wait(5)
-            end
-        end)
+            end)
+        end
+    else
+        if XenoHub.Flags.antiafk_conn then
+            XenoHub.Flags.antiafk_conn:Disconnect()
+            XenoHub.Flags.antiafk_conn = nil
+        end
     end
     XenoHub:Notify("Anti-AFK", XenoHub.Flags.antiafk and "Enabled" or "Disabled")
 end)
@@ -1314,7 +1375,7 @@ end)
 -- World
 XenoHub:AddCmd("btools", {"f3x", "fex"}, "Give building tools", function()
     pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/f3x.lua"))()
+        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/f3x.lua"))() end)
         XenoHub:Notify("BTools", "Building tools given")
     end)
 end)
@@ -1339,7 +1400,7 @@ XenoHub:AddCmd("deleteclass", {"dc", "removeclass"}, "Delete parts by class", fu
 end)
 
 XenoHub:AddCmd("removeterrain", {"rterrain", "noterrain"}, "Remove terrain", function()
-    Workspace.Terrain:Clear()
+    pcall(function() Workspace.Terrain:Clear() end)
 end)
 
 -- UI
@@ -1349,7 +1410,7 @@ XenoHub:AddCmd("notify", {}, "Send notification", function(args)
 end)
 
 XenoHub:AddCmd("console", {}, "Open Roblox console", function()
-    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeXY/infiniteyield/master/console.lua"))() end)
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/console.lua"))() end)
 end)
 
 XenoHub:AddCmd("hideiy", {"hidehub", "hidegui"}, "Toggle hub visibility", function()
@@ -1409,8 +1470,12 @@ mainTab:Toggle("ESP (Players)", false, function(state) XenoHub.Flags.esp_enabled
         for _, p in ipairs(Players:GetPlayers()) do if p.Character then local h = p.Character:FindFirstChild("XenoESP"); if h then h:Destroy() end end end
     end
 end)
-mainTab:Toggle("FPS Counter", false, function(state) XenoHub:ExecCmd(state and "fps" or "fps") end)
-mainTab:Toggle("Anti-AFK", false, function(state) XenoHub:ExecCmd("antiafk") end)
+mainTab:Toggle("FPS Counter", false, function(state)
+    if state ~= XenoHub.Flags.fps then XenoHub:ExecCmd("fps") end
+end)
+mainTab:Toggle("Anti-AFK", false, function(state)
+    if state ~= XenoHub.Flags.antiafk then XenoHub:ExecCmd("antiafk") end
+end)
 
 -- Movement tab
 local moveTab = tabs:Tab("Movement")
@@ -1423,14 +1488,34 @@ moveTab:Slider("Jump Power", 50, 400, 50, function(v) XenoHub:ExecCmd("jumppower
 moveTab:Slider("Gravity", 0, 500, 196, function(v) XenoHub:ExecCmd("gravity " .. v) end)
 moveTab:Button("Spin", function() XenoHub:ExecCmd("spin") end)
 moveTab:Button("Anti-Void", function() XenoHub:ExecCmd("antivoid") end)
-moveTab:Button("No Fall Damage", function()
-    XenoHub.Flags.nofall = not XenoHub.Flags.nofall
-    if XenoHub.Flags.nofall then
-        LP.CharacterAdded:Connect(function(char)
-            char:WaitForChild("Humanoid").StateChanged:Connect(function(_, new)
-                if new == Enum.HumanoidStateType.Freefall and XenoHub.Flags.nofall then char.Humanoid:ChangeState(Enum.HumanoidStateType.Landed) end
+moveTab:Toggle("No Fall Damage", false, function(state)
+    XenoHub.Flags.nofall = state
+    if state then
+        if XenoHub.Flags.nofall_conn then XenoHub.Flags.nofall_conn:Disconnect() end
+        XenoHub.Flags.nofall_conn = LP.CharacterAdded:Connect(function(char)
+            local hum = char:WaitForChild("Humanoid")
+            local stateConn
+            stateConn = hum.StateChanged:Connect(function(_, new)
+                if new == Enum.HumanoidStateType.Freefall and XenoHub.Flags.nofall then
+                    hum:ChangeState(Enum.HumanoidStateType.Landed)
+                end
+            end)
+            char:AncestryChanged:Connect(function()
+                if not char.Parent and stateConn then stateConn:Disconnect() end
             end)
         end)
+        -- Also apply to current character
+        if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+            local hum = LP.Character.Humanoid
+            local stateConn
+            stateConn = hum.StateChanged:Connect(function(_, new)
+                if new == Enum.HumanoidStateType.Freefall and XenoHub.Flags.nofall then
+                    hum:ChangeState(Enum.HumanoidStateType.Landed)
+                end
+            end)
+        end
+    else
+        if XenoHub.Flags.nofall_conn then XenoHub.Flags.nofall_conn:Disconnect(); XenoHub.Flags.nofall_conn = nil end
     end
 end)
 
@@ -1445,9 +1530,7 @@ tpTab:Separator()
 tpTab:Section("Waypoints")
 tpTab:Input("Save waypoint", function(t) XenoHub:ExecCmd("waypoint " .. t .. " set") end, "name")
 tpTab:Input("Go to waypoint", function(t) XenoHub:ExecCmd("waypoint " .. t) end, "name")
-tpTab:Button("Look at Player", function()
-    tpTab:Input("Look at", function(t) XenoHub:ExecCmd("lookat " .. t) end, "username")
-end)
+tpTab:Input("Look at player", function(t) XenoHub:ExecCmd("lookat " .. t) end, "username")
 
 -- Visual tab
 local visualTab = tabs:Tab("Visuals")
@@ -1496,7 +1579,7 @@ trollTab:Separator()
 trollTab:Section("World Trolling")
 trollTab:Input("Unanchor Nearby (radius)", function(t) XenoHub:ExecCmd("unanchor " .. t) end, "50")
 trollTab:Input("Delete Part by Name", function(t) XenoHub:ExecCmd("delete " .. t) end, "part name")
-trollTab:Button("Remove Terrain", function() Workspace.Terrain:Clear() end)
+trollTab:Button("Remove Terrain", function() pcall(function() Workspace.Terrain:Clear() end) end)
 trollTab:Button("BTools", function() XenoHub:ExecCmd("btools") end)
 
 -- Server tab
@@ -1506,7 +1589,7 @@ serverTab:Button("Server Hop", function() XenoHub:ExecCmd("serverhop") end)
 serverTab:Button("Toggle Fullscreen", function() XenoHub:ExecCmd("togglefullscreen") end)
 serverTab:Button("Console", function() XenoHub:ExecCmd("console") end)
 serverTab:Button("Open DEX Explorer", function()
-    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeX/infiniteyield/master/dex.lua"))() end)
+    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/dex.lua"))() end)
 end)
 serverTab:Button("Server Info", function() XenoHub:ExecCmd("serverinfo") end)
 serverTab:Button("Show Ping", function() XenoHub:ExecCmd("ping") end)
@@ -1596,25 +1679,7 @@ UserInputService.InputEnded:Connect(function(input, gpe)
     if input.KeyCode == Enum.KeyCode.LeftShift and XenoHub.Flags.fly then XenoHub.Flags.fly_down = false end
 end)
 
--- Fly physics
-RunService.RenderStepped:Connect(function()
-    if XenoHub.Flags.fly and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = LP.Character.HumanoidRootPart
-        local bv = hrp:FindFirstChild("XenoFly")
-        if bv then
-            local dir = Vector3.new(0, 0, 0)
-            if XenoHub.Flags.fly_up then dir = dir + Vector3.new(0, 1, 0) end
-            if XenoHub.Flags.fly_down then dir = dir + Vector3.new(0, -1, 0) end
-            local camLook = Camera.CFrame.LookVector
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + camLook end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - camLook end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
-            if dir.Magnitude > 0 then dir = dir.Unit * (XenoHub.Flags.fly_speed or 50) end
-            bv.Velocity = dir
-        end
-    end
-end)
+-- Fly physics (managed by fly/unfly commands, defined above)
 
 -- Infinite jump
 UserInputService.JumpRequest:Connect(function()
