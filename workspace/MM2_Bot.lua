@@ -154,13 +154,21 @@ local function findSafeSpot()
     end
 end
 
--- Death detection
-local murderedConn
-local function onMurdered(victim, killer)
-    if victim == LP then report.deaths = report.deaths + 1; localDead = true; return end
-    -- Someone else died - mark it
-    -- If we see someone die near us as innocent, we know murderer is close
+-- Kill/death tracking
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LP then
+        local hum = getHum(p)
+        if hum then hum.Died:Connect(function() if role == "Murderer" then report.kills = report.kills + 1 end end) end
+    end
 end
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LP then
+        p.CharacterAdded:Connect(function(char)
+            local hum = char:WaitForChild("Humanoid", 5)
+            if hum then hum.Died:Connect(function() if role == "Murderer" then report.kills = report.kills + 1 end end) end
+        end)
+    end
+end)
 
 -- Role-based AI connections
 local aiConns = {}
@@ -207,15 +215,20 @@ local function startSheriffAI()
 
             if Config.Sheriff.AutoShoot then
                 if Config.Sheriff.TriggerHappy then
-                    while wait() do activateTool(gun) end
+                    activateTool(gun) activateTool(gun) activateTool(gun)
                 else
                     activateTool(gun)
                 end
                 report.shots = report.shots + 1
             end
 
-            -- Move toward murderer slowly (advance)
-            moveTo(mHRP.Position, 22)
+            -- If murderer is < 30 studs, backpedal
+            if dist < 30 then
+                local retreat = (myHRP.Position - mHRP.Position).Unit * 50
+                moveTo(myHRP.Position + retreat, 24)
+            else
+                moveTo(mHRP.Position, 22)
+            end
         else
             -- Chase the murderer
             moveTo(mHRP.Position, Config.Murderer.ChaseSpeed or 40)
@@ -397,7 +410,7 @@ local function startInnocentAI()
     local jumpConn = RunService.Heartbeat:Connect(function()
         if not Config.Enabled or role ~= "Innocent" or not alive(LP) then return end
         local hum = getHum(LP)
-        if hum and hum.FloorMaterial ~= Enum.Material.Air then
+        if hum and hum.FloorMaterial and hum.FloorMaterial ~= Enum.Material.Air then
             hum:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end)
@@ -433,11 +446,21 @@ task.spawn(function()
     end
 end)
 
--- Death/kill tracking
+-- Local player death/respawn
+local function trackLPDeath()
+    local hum = getHum(LP)
+    if hum then
+        hum.Died:Connect(function()
+            localDead = true; report.deaths = report.deaths + 1
+            clearAI()
+        end)
+    end
+end
+trackLPDeath()
 LP.CharacterAdded:Connect(function(char)
     task.wait(0.5)
     localDead = false
-    -- Bot re-detects role on respawn
+    trackLPDeath()
 end)
 
 -- === RAYFIELD UI ===
@@ -482,7 +505,6 @@ task.spawn(function()
         task.wait(1)
         local targetName = targetPlayer and targetPlayer.Name or "None"
         local isAlive = alive(LP) and "Yes" or "No"
-        local prevStatus = statusP.Content
         statusP:Set({
             Title = "Bot Status",
             Content = "Role: " .. role .. "\nTarget: " .. targetName .. "\nAlive: " .. isAlive .. "\n\nStats:\nKills: " .. report.kills .. "\nDeaths: " .. report.deaths .. "\nShots: " .. report.shots .. "\nCoins: " .. report.coins
